@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor as Executor, wait
 import time
 import logging
 from redis import StrictRedis
+import signal
 
 
 class Beater(object):
@@ -20,6 +21,8 @@ class Beater(object):
         self.executor = None
         self.redis = None
         self.last_pool_index = -1
+        signal.signal(signal.SIGINT, self._exit)
+        signal.signal(signal.SIGTERM, self._exit)
 
         self.logger = logging.getLogger("beater.%d" % interval)
 
@@ -89,7 +92,11 @@ class Beater(object):
                 if cost < 1:
                     time.sleep((end_timestamp + 1) - start_time)  # 等到下秒
 
+    def _exit(self, signum, frame):
+        self.stop()
+
     def stop(self):
+        self.logger.warning('beater %d exit' % self.interval)
         self.beating = False
 
     def clean(self):

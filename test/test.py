@@ -1,23 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from redis import StrictRedis
+from HeartbeatMaker import HeartbeatMaker
+import arrow
 
-import base64
-import binascii
-import hashlib
 
-data=base64.decodebytes('yTDuayk5ABcJBgYyEQAAAAAAAAAEkwjQcU+u5ZHwIhQJCQvLfL1Q'.encode())
-print(binascii.hexlify(data))
+def test(it):
+    print('%s:%s:心跳' % (arrow.now(), it))
 
-req = binascii.unhexlify('c930ee6b29390017090606321100000000000000049308')
-# req += binascii.unhexlify('161205114500')
 
-string = '7458d973f9124680'.encode('utf-8') + req
+maker = HeartbeatMaker('redis://localhost:6379/0', 'test-beat', test)
 
-unsign = string[0:56]
+# maker.clean()
+maker.beat_it('bac', 5)
+maker.beat_it('jack', 15)
+# maker.omit_it('bac')
 
-if len(unsign) < 56:
-    unsign += bytes(56 - len(unsign))
-
-md5 = hashlib.md5(unsign).digest()
-print(binascii.hexlify(md5))
+# maker.start()
