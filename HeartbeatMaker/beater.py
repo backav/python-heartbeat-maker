@@ -9,10 +9,11 @@ import signal
 
 
 class Beater(object):
-    def __init__(self, redis_url, prefix_key, interval, beat_callback, worker_number=1):
+    def __init__(self, redis_url, prefix_key, interval, beat_callback=None, callback_pars=None, worker_number=1):
         self.redis_url = redis_url
         self.interval = interval
         self.beat_callback = beat_callback
+        self.callback_pars = callback_pars
         self.worker_number = worker_number
         self.prefix_key = prefix_key + ':beater-' + str(interval)
         self.beating_mapping_key = self.prefix_key + ':beating-items'
@@ -154,7 +155,8 @@ class Beater(object):
             if par:
                 par = par.decode('utf-8')
             fs.append(
-                self.executor.submit(self.beat_callback, it.decode('utf-8'), {"interval": self.interval, "par": par}))
+                self.executor.submit(self.beat_callback, it.decode('utf-8'),
+                                     {"interval": self.interval, "par": par, "pars": self.callback_pars}))
         wait(fs)
 
     def _get_pool(self, timestamp):

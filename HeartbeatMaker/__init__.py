@@ -9,13 +9,14 @@ import signal
 
 
 class HeartbeatMaker(object):
-    def __init__(self, redis_url, prefix_key, beat_callback, max_beaters=20, beater_workers=1):
+    def __init__(self, redis_url, prefix_key, beat_callback, callback_pars, max_beaters=20, beater_workers=1):
         self.redis_url = redis_url
         self.prefix_key = prefix_key
         self.beaters_key = self.prefix_key + ":beaters"
         self.beaters = set()
         self.beater_workers = beater_workers
         self.beat_callback = beat_callback
+        self.callback_pars = callback_pars
         self.logger = logging.getLogger("HeartbeatMaker")
 
         redis = self._get_redis()
@@ -58,14 +59,16 @@ class HeartbeatMaker(object):
 
     def clean(self):
         for interval in self.beaters:
-            beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.beater_workers)
+            beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.callback_pars,
+                            self.beater_workers)
             beater.clean()
         self._get_redis().delete(self.beaters_key)
         self.beaters.clear()
 
     def beat_it(self, it, interval, par=None):
         self.omit_it(it)
-        beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.beater_workers)
+        beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.callback_pars,
+                        self.beater_workers)
         beater.beat_it(it, par)
         self._get_redis().sadd(self.beaters_key, interval)
         self.beaters.add(interval)
@@ -74,11 +77,13 @@ class HeartbeatMaker(object):
 
     def omit_it(self, it):
         for interval in self.beaters:
-            beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.beater_workers)
+            beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.callback_pars,
+                            self.beater_workers)
             beater.omit_it(it)
 
     def _create_beater(self, interval):
         return self.workers.submit(_create_worker, self.redis_url, self.prefix_key, interval, self.beat_callback,
+                                   self.callback_pars,
                                    self.beater_workers)
 
     def _watch_new_interval(self, ps):
@@ -95,6 +100,6 @@ class HeartbeatMaker(object):
         return StrictRedis.from_url(self.redis_url)
 
 
-def _create_worker(redis_url, prefix_key, interval, beat_callback, worker_number):
-    beater = Beater(redis_url, prefix_key, interval, beat_callback, worker_number)
+def _create_worker(redis_url, prefix_key, interval, beat_callback,callback_pars, worker_number):
+    beater = Beater(redis_url, prefix_key, interval, beat_callback,callback_pars, worker_number)
     beater.start()
