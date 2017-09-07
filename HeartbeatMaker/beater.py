@@ -16,6 +16,7 @@ class Beater(object):
         self.worker_number = worker_number
         self.prefix_key = prefix_key + ':beater-' + str(interval)
         self.beating_mapping_key = self.prefix_key + ':beating-items'
+        self.beating_items_cache_key = self.prefix_key + ':beating-items:par'
 
         self.beating = False
         self.executor = None
@@ -26,7 +27,7 @@ class Beater(object):
 
         self.logger = logging.getLogger("beater.%d" % interval)
 
-    def beat_it(self, it):
+    def beat_it(self, it, par=None):
 
         if self._get_redis().hexists(self.beating_mapping_key, it):
             return
@@ -44,6 +45,8 @@ class Beater(object):
                     pipeline = self._get_redis().pipeline()
                     pipeline.sadd(pool_key, it)
                     pipeline.hset(self.beating_mapping_key, it, i)
+                    if par:
+                        pipeline.hset(self.beating_items_cache_key, it, par)
                     pipeline.execute()
                     break
 
@@ -54,6 +57,8 @@ class Beater(object):
                         pipeline = self._get_redis().pipeline()
                         pipeline.sadd(first_pool_key, it)
                         pipeline.hset(self.beating_mapping_key, it, 0)
+                        if par:
+                            pipeline.hset(self.beating_items_cache_key, it, par)
                         pipeline.execute()
                         break
                     else:
@@ -63,6 +68,8 @@ class Beater(object):
                 pipeline = self._get_redis().pipeline()
                 pipeline.sadd(pool_key, it)
                 pipeline.hset(self.beating_mapping_key, it, i)
+                if par:
+                    pipeline.hset(self.beating_items_cache_key, it, par)
                 pipeline.execute()
 
                 break
@@ -75,6 +82,7 @@ class Beater(object):
             pipeline = self._get_redis().pipeline()
             pipeline.srem(pool_key, it)
             pipeline.hdel(self.beating_mapping_key, it)
+            pipeline.hdel(self.beating_items_cache_key, it)
             pipeline.execute()
 
     def start(self):
@@ -105,6 +113,7 @@ class Beater(object):
             pipeline.delete(self.prefix_key + ":pool:%d" % i)
 
         pipeline.delete(self.beating_mapping_key)
+        pipeline.delete(self.beating_items_cache_key)
         pipeline.execute()
 
     def _get_redis(self):
@@ -140,7 +149,10 @@ class Beater(object):
 
         fs = []
         for it in items:
-            fs.append(self.executor.submit(self.beat_callback, it.decode('utf-8')))
+            par = self._get_redis().hget(self.beating_items_cache_key, it)
+            if par:
+                par = par.decode('utf-8')
+            fs.append(self.executor.submit(self.beat_callback, it.decode('utf-8'), par))
         wait(fs)
 
     def _get_pool(self, timestamp):

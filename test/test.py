@@ -13,8 +13,8 @@ def test(it):
 maker = HeartbeatMaker('redis://localhost:6379/0', 'test-beat', test)
 
 # maker.clean()
-maker.beat_it('bac', 5)
-maker.beat_it('jack', 15)
-# maker.omit_it('bac')
+# maker.beat_it('bac', 6,'bac-par')
+# maker.beat_it('shawn', 2,'par')
+maker.omit_it('bac')
 
 # maker.start()

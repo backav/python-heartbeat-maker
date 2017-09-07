@@ -31,7 +31,16 @@ class HeartbeatMaker(object):
     def start(self):
 
         #  监视新的beater
-        self.watcher_worker.submit(self._watch_new_interval)
+        ps = self._get_redis().pubsub()
+        ps.subscribe(self.prefix_key + ":new-interval")
+
+        def _exit(signum, frame):
+            ps.unsubscribe()
+            self.logger.warning('new beater watcher exit')
+
+        signal.signal(signal.SIGINT, _exit)
+        signal.signal(signal.SIGTERM, _exit)
+        self.watcher_worker.submit(self._watch_new_interval,ps)
 
         fs = []
         for interval in self.beaters:
@@ -52,10 +61,10 @@ class HeartbeatMaker(object):
             beater.clean()
         self._get_redis().delete(self.beaters_key)
 
-    def beat_it(self, it, interval):
+    def beat_it(self, it, interval, par=None):
         self.omit_it(it)
         beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.beater_workers)
-        beater.beat_it(it)
+        beater.beat_it(it, par)
         self._get_redis().sadd(self.beaters_key, interval)
         self.beaters.add(interval)
 
@@ -70,16 +79,7 @@ class HeartbeatMaker(object):
         return self.workers.submit(_create_worker, self.redis_url, self.prefix_key, interval, self.beat_callback,
                                    self.beater_workers)
 
-    def _watch_new_interval(self):
-        ps = self._get_redis().pubsub()
-        ps.subscribe(self.prefix_key + ":new-interval")
-
-        def _exit(signum, frame):
-            ps.unsubscribe()
-            self.logger.warning('new beater watcher exit')
-
-        signal.signal(signal.SIGINT, _exit)
-        signal.signal(signal.SIGTERM, _exit)
+    def _watch_new_interval(self,ps):
 
         for item in ps.listen():
             if item['type'] == 'message':
