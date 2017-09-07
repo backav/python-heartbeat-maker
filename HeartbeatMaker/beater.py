@@ -153,7 +153,8 @@ class Beater(object):
             par = self._get_redis().hget(self.beating_items_cache_key, it)
             if par:
                 par = par.decode('utf-8')
-            fs.append(self.executor.submit(self.beat_callback, it.decode('utf-8'), par))
+            fs.append(
+                self.executor.submit(self.beat_callback, it.decode('utf-8'), {"interval": self.interval, "par": par}))
         wait(fs)
 
     def _get_pool(self, timestamp):

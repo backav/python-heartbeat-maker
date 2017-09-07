@@ -42,13 +42,14 @@ class HeartbeatMaker(object):
         signal.signal(signal.SIGTERM, _exit)
         self.watcher_worker.submit(self._watch_new_interval, ps)
 
-        fs = []
-        for interval in self.beaters:
-            f = self._create_beater(interval)
-            fs.append(f)
         try:
+            fs = []
+            for interval in self.beaters:
+                f = self._create_beater(interval)
+                fs.append(f)
             wait(fs)
         except KeyboardInterrupt:
+            _exit(None, None)
             self.stop()
 
     def stop(self):
