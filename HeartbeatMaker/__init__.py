@@ -9,7 +9,7 @@ import signal
 
 
 class HeartbeatMaker(object):
-    def __init__(self, redis_url, prefix_key, beat_callback, callback_pars, max_beaters=20, beater_workers=1):
+    def __init__(self, redis_url, prefix_key, beat_callback=None, callback_pars=None, max_beaters=20, beater_workers=1):
         self.redis_url = redis_url
         self.prefix_key = prefix_key
         self.beaters_key = self.prefix_key + ":beaters"
@@ -100,6 +100,6 @@ class HeartbeatMaker(object):
         return StrictRedis.from_url(self.redis_url)
 
 
-def _create_worker(redis_url, prefix_key, interval, beat_callback,callback_pars, worker_number):
-    beater = Beater(redis_url, prefix_key, interval, beat_callback,callback_pars, worker_number)
+def _create_worker(redis_url, prefix_key, interval, beat_callback, callback_pars, worker_number):
+    beater = Beater(redis_url, prefix_key, interval, beat_callback, callback_pars, worker_number)
     beater.start()
