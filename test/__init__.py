@@ -15,7 +15,7 @@ maker = HeartbeatMaker('redis://localhost:6379/0', 'test-beat', test)
 
 maker.clean()
 # maker.beat_it('bac', 5)
-# maker.beat_it('jack', 5, 'test')
+maker.beat_it('jack', 5, 'test')
 
 atexit.register(maker.stop)
 

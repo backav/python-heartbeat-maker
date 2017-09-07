@@ -22,8 +22,6 @@ class Beater(object):
         self.executor = None
         self.redis = None
         self.last_pool_index = -1
-        signal.signal(signal.SIGINT, self._exit)
-        signal.signal(signal.SIGTERM, self._exit)
 
         self.logger = logging.getLogger("beater.%d" % interval)
 
@@ -88,9 +86,12 @@ class Beater(object):
     def start(self):
         if self.beating:
             return
+        signal.signal(signal.SIGINT, self._exit)
+        signal.signal(signal.SIGTERM, self._exit)
 
         self.executor = Executor(max_workers=self.worker_number)
         self.beating = True
+        self.last_pool_index = -1
 
         while self.beating:
             start_time = time.time()
