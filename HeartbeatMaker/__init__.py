@@ -40,7 +40,7 @@ class HeartbeatMaker(object):
 
         signal.signal(signal.SIGINT, _exit)
         signal.signal(signal.SIGTERM, _exit)
-        self.watcher_worker.submit(self._watch_new_interval,ps)
+        self.watcher_worker.submit(self._watch_new_interval, ps)
 
         fs = []
         for interval in self.beaters:
@@ -60,6 +60,7 @@ class HeartbeatMaker(object):
             beater = Beater(self.redis_url, self.prefix_key, interval, self.beat_callback, self.beater_workers)
             beater.clean()
         self._get_redis().delete(self.beaters_key)
+        self.beaters.clear()
 
     def beat_it(self, it, interval, par=None):
         self.omit_it(it)
@@ -79,7 +80,7 @@ class HeartbeatMaker(object):
         return self.workers.submit(_create_worker, self.redis_url, self.prefix_key, interval, self.beat_callback,
                                    self.beater_workers)
 
-    def _watch_new_interval(self,ps):
+    def _watch_new_interval(self, ps):
 
         for item in ps.listen():
             if item['type'] == 'message':
