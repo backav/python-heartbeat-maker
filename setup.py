@@ -8,7 +8,7 @@ __author__ = 'bac'
 
 setup(
     name='HeartbeatMaker',
-    version='0.8',
+    version='0.9',
     keywords=('heartbeat', 'redis'),
     description=u'一个简易的定时器,会将定定时配置信息保存在redis',
     license='Apache License',

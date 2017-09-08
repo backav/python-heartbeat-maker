@@ -95,6 +95,9 @@ class Beater(object):
         self.last_pool_index = -1
 
         while self.beating:
+            if self._get_redis().hlen(self.beating_mapping_key) <= 0:
+                self.logger.warning('beater(%d) exit:no task to run' % self.interval)
+                break
             start_time = time.time()
             cost = self._tick()
             end_timestamp = int(time.time())
@@ -103,10 +106,11 @@ class Beater(object):
                     time.sleep((end_timestamp + 1) - start_time)  # 等到下秒
 
     def _exit(self, signum, frame):
-        self.stop()
+        if self.beating:
+            self.stop()
 
     def stop(self):
-        self.logger.warning('beater %d exit' % self.interval)
+        self.logger.warning('beater(%d)exit' % self.interval)
         self.beating = False
 
     def clean(self):

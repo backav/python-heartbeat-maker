@@ -7,17 +7,21 @@ from redis import StrictRedis
 import logging
 import signal
 
+logger = logging.getLogger("HeartbeatMaker")
+
 
 class HeartbeatMaker(object):
     def __init__(self, redis_url, prefix_key, beat_callback=None, callback_pars=None, max_beaters=20, beater_workers=1):
         self.redis_url = redis_url
         self.prefix_key = prefix_key
         self.beaters_key = self.prefix_key + ":beaters"
+        self.max_beaters = max_beaters
         self.beaters = set()
         self.beater_workers = beater_workers
         self.beat_callback = beat_callback
         self.callback_pars = callback_pars
-        self.logger = logging.getLogger("HeartbeatMaker")
+        self.logger = logger
+        self.beating = False
 
         redis = self._get_redis()
         bs = redis.smembers(self.beaters_key)
@@ -26,10 +30,9 @@ class HeartbeatMaker(object):
                 interval = int(beater)
                 self.beaters.add(interval)
 
-        self.workers = Executor(max_workers=max_beaters)
-        self.watcher_worker = TExecutor(max_workers=1)
-
     def start(self):
+
+        self.beating = True
 
         #  监视新的beater
         ps = self._get_redis().pubsub()
@@ -37,25 +40,29 @@ class HeartbeatMaker(object):
 
         def _exit(signum, frame):
             ps.unsubscribe()
-            self.logger.warning('new beater watcher exit')
+            self.stop()
 
         signal.signal(signal.SIGINT, _exit)
         signal.signal(signal.SIGTERM, _exit)
-        self.watcher_worker.submit(self._watch_new_interval, ps)
 
+        self.workers = Executor(max_workers=self.max_beaters)
         try:
-            fs = []
+
             for interval in self.beaters:
                 f = self._create_beater(interval)
-                fs.append(f)
-            wait(fs)
+                f.add_done_callback(lambda x: self.beaters.discard(interval))
+
+            self.logger.warning('%d beater started' % len(self.beaters))
+
+            self._watch_new_interval(ps)
         except KeyboardInterrupt:
             _exit(None, None)
-            self.stop()
+        self.logger.warning('heartbeat maker exit')
 
     def stop(self):
-        self.workers.shutdown()
-        self.watcher_worker.shutdown()
+        if self.beating:
+            self.beating = False
+            self.logger.warning('stoped')
 
     def clean(self):
         for interval in self.beaters:
@@ -88,18 +95,29 @@ class HeartbeatMaker(object):
 
     def _watch_new_interval(self, ps):
 
-        for item in ps.listen():
-            if item['type'] == 'message':
-                interval = int(item['data'])
-                if interval not in self.beaters:
-                    self._create_beater(interval)
-                    self.beaters.add(interval)
-                    self.logger.info("创建新的Beater(interval=%d)" % interval)
+        self.logger.warning('new-beater-watcher started')
+        try:
+
+            for item in ps.listen():
+                if item['type'] == 'message':
+                    interval = int(item['data'])
+                    if interval not in self.beaters:
+                        self._create_beater(interval)
+                        self.beaters.add(interval)
+                        self.logger.info("创建新的Beater(interval=%d)" % interval)
+
+        except:
+            self.logger.exception('等待新Beater时,出现异常')
+
+        self.logger.warning('new-beater-watcher exit')
 
     def _get_redis(self):
         return StrictRedis.from_url(self.redis_url)
 
 
 def _create_worker(redis_url, prefix_key, interval, beat_callback, callback_pars, worker_number):
-    beater = Beater(redis_url, prefix_key, interval, beat_callback, callback_pars, worker_number)
-    beater.start()
+    try:
+        beater = Beater(redis_url, prefix_key, interval, beat_callback, callback_pars, worker_number)
+        beater.start()
+    except:
+        logger.exception('worker出现异常')
